@@ -29,6 +29,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-ss-server/ipinfo"
+	onet "github.com/Jigsaw-Code/outline-ss-server/net"
 	"github.com/Jigsaw-Code/outline-ss-server/service"
 	"github.com/op/go-logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -66,10 +67,11 @@ type ssPort struct {
 }
 
 type SSServer struct {
-	natTimeout  time.Duration
-	m           *outlineMetrics
-	replayCache service.ReplayCache
-	ports       map[int]*ssPort
+	natTimeout        time.Duration
+	m                 *outlineMetrics
+	replayCache       service.ReplayCache
+	ports             map[int]*ssPort
+	targetIPValidator onet.TargetIPValidator
 }
 
 func (s *SSServer) startPort(portNum int) error {
@@ -89,6 +91,10 @@ func (s *SSServer) startPort(portNum int) error {
 	// TODO: Register initial data metrics at zero.
 	tcpHandler := service.NewTCPHandler(portNum, port.cipherList, &s.replayCache, s.m, tcpReadTimeout)
 	packetHandler := service.NewPacketHandler(s.natTimeout, port.cipherList, s.m)
+	if s.targetIPValidator != nil {
+		tcpHandler.SetTargetIPValidator(s.targetIPValidator)
+		packetHandler.SetTargetIPValidator(s.targetIPValidator)
+	}
 	s.ports[portNum] = port
 	accept := func() (transport.StreamConn, error) {
 		conn, err := listener.AcceptTCP()
@@ -178,7 +184,7 @@ func (s *SSServer) Stop() error {
 }
 
 // RunSSServer starts a shadowsocks server running, and returns the server or an error.
-func RunSSServer(filename string, natTimeout time.Duration, sm *outlineMetrics, replayHistory int) (*SSServer, error) {
+func RunSSServer(filename string, natTimeout time.Duration, sm *outlineMetrics, replayHistory int, targetIPValidator onet.TargetIPValidator) (*SSServer, error) {
 	server := &SSServer{
 		natTimeout:  natTimeout,
 		m:           sm,
@@ -226,6 +232,7 @@ func readConfig(filename string) (*Config, error) {
 
 func main() {
 	var flags struct {
+		AllowAll      bool
 		ConfigFile    string
 		MetricsAddr   string
 		IPCountryDB   string
@@ -235,6 +242,7 @@ func main() {
 		Verbose       bool
 		Version       bool
 	}
+	flag.BoolVar(&flags.AllowAll, "allow_all", false, "Allow access to all addresses including localhost")
 	flag.StringVar(&flags.ConfigFile, "config", "", "Configuration filename")
 	flag.StringVar(&flags.MetricsAddr, "metrics", "", "Address for the Prometheus metrics")
 	flag.StringVar(&flags.IPCountryDB, "ip_country_db", "", "Path to the ip-to-country mmdb file")
@@ -285,7 +293,13 @@ func main() {
 
 	m := newPrometheusOutlineMetrics(ip2info, prometheus.DefaultRegisterer)
 	m.SetBuildInfo(version)
-	_, err = RunSSServer(flags.ConfigFile, flags.natTimeout, m, flags.replayHistory)
+	var targetIPValidator onet.TargetIPValidator = nil
+	if flags.AllowAll {
+		logger.Infof("Allow access to all addresses including localhost")
+		targetIPValidator = onet.AllowAll
+	}
+
+	_, err = RunSSServer(flags.ConfigFile, flags.natTimeout, m, flags.replayHistory, targetIPValidator)
 	if err != nil {
 		logger.Fatalf("Server failed to start: %v. Aborting", err)
 	}

@@ -41,12 +41,6 @@ func init() {
 	logging.SetLevel(logging.INFO, "")
 }
 
-func allowAll(ip net.IP) *onet.ConnectionError {
-	// Allow access to localhost so that we can run integration tests with
-	// an actual destination server.
-	return nil
-}
-
 func startTCPEchoServer(t testing.TB) (*net.TCPListener, *sync.WaitGroup) {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	if err != nil {
@@ -114,7 +108,7 @@ func TestTCPEcho(t *testing.T) {
 	replayCache := service.NewReplayCache(5)
 	const testTimeout = 200 * time.Millisecond
 	handler := service.NewTCPHandler(proxyListener.Addr().(*net.TCPAddr).Port, cipherList, &replayCache, &service.NoOpTCPMetrics{}, testTimeout)
-	handler.SetTargetIPValidator(allowAll)
+	handler.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		service.StreamServe(func() (transport.StreamConn, error) { return proxyListener.AcceptTCP() }, handler.Handle)
@@ -269,7 +263,7 @@ func TestUDPEcho(t *testing.T) {
 	}
 	testMetrics := &fakeUDPMetrics{}
 	proxy := service.NewPacketHandler(time.Hour, cipherList, testMetrics)
-	proxy.SetTargetIPValidator(allowAll)
+	proxy.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		proxy.Handle(proxyConn)
@@ -362,7 +356,7 @@ func BenchmarkTCPThroughput(b *testing.B) {
 	}
 	const testTimeout = 200 * time.Millisecond
 	handler := service.NewTCPHandler(proxyListener.Addr().(*net.TCPAddr).Port, cipherList, nil, &service.NoOpTCPMetrics{}, testTimeout)
-	handler.SetTargetIPValidator(allowAll)
+	handler.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		service.StreamServe(service.WrapStreamListener(proxyListener.AcceptTCP), handler.Handle)
@@ -424,7 +418,7 @@ func BenchmarkTCPMultiplexing(b *testing.B) {
 	replayCache := service.NewReplayCache(service.MaxCapacity)
 	const testTimeout = 200 * time.Millisecond
 	handler := service.NewTCPHandler(proxyListener.Addr().(*net.TCPAddr).Port, cipherList, &replayCache, &service.NoOpTCPMetrics{}, testTimeout)
-	handler.SetTargetIPValidator(allowAll)
+	handler.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		service.StreamServe(service.WrapStreamListener(proxyListener.AcceptTCP), handler.Handle)
@@ -497,7 +491,7 @@ func BenchmarkUDPEcho(b *testing.B) {
 		b.Fatal(err)
 	}
 	proxy := service.NewPacketHandler(time.Hour, cipherList, &service.NoOpUDPMetrics{})
-	proxy.SetTargetIPValidator(allowAll)
+	proxy.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		proxy.Handle(server)
@@ -541,7 +535,7 @@ func BenchmarkUDPManyKeys(b *testing.B) {
 		b.Fatal(err)
 	}
 	proxy := service.NewPacketHandler(time.Hour, cipherList, &service.NoOpUDPMetrics{})
-	proxy.SetTargetIPValidator(allowAll)
+	proxy.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		proxy.Handle(proxyConn)

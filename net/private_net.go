@@ -61,3 +61,8 @@ func RequirePublicIP(ip net.IP) *ConnectionError {
 	}
 	return nil
 }
+
+func AllowAll(ip net.IP) *ConnectionError {
+	// Allow access to all addresses including localhost
+	return nil
+}

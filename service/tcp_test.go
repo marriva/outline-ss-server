@@ -39,12 +39,6 @@ func init() {
 	logging.SetLevel(logging.INFO, "")
 }
 
-func allowAll(ip net.IP) *onet.ConnectionError {
-	// Allow access to localhost so that we can run integration tests with
-	// an actual destination server.
-	return nil
-}
-
 func makeLocalhostListener(t testing.TB) *net.TCPListener {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	require.NoError(t, err, "ListenTCP failed: %v", err)
@@ -353,7 +347,7 @@ func TestProbeClientBytesBasicTruncated(t *testing.T) {
 	cipher := firstCipher(cipherList)
 	testMetrics := &probeTestMetrics{}
 	handler := NewTCPHandler(listener.Addr().(*net.TCPAddr).Port, cipherList, nil, testMetrics, 200*time.Millisecond)
-	handler.SetTargetIPValidator(allowAll)
+	handler.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		StreamServe(WrapStreamListener(listener.AcceptTCP), handler.Handle)
@@ -388,7 +382,7 @@ func TestProbeClientBytesBasicModified(t *testing.T) {
 	cipher := firstCipher(cipherList)
 	testMetrics := &probeTestMetrics{}
 	handler := NewTCPHandler(listener.Addr().(*net.TCPAddr).Port, cipherList, nil, testMetrics, 200*time.Millisecond)
-	handler.SetTargetIPValidator(allowAll)
+	handler.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		StreamServe(WrapStreamListener(listener.AcceptTCP), handler.Handle)
@@ -424,7 +418,7 @@ func TestProbeClientBytesCoalescedModified(t *testing.T) {
 	cipher := firstCipher(cipherList)
 	testMetrics := &probeTestMetrics{}
 	handler := NewTCPHandler(listener.Addr().(*net.TCPAddr).Port, cipherList, nil, testMetrics, 200*time.Millisecond)
-	handler.SetTargetIPValidator(allowAll)
+	handler.SetTargetIPValidator(onet.AllowAll)
 	done := make(chan struct{})
 	go func() {
 		StreamServe(WrapStreamListener(listener.AcceptTCP), handler.Handle)

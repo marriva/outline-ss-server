@@ -23,7 +23,7 @@ import (
 
 func TestRunSSServer(t *testing.T) {
 	m := newPrometheusOutlineMetrics(nil, prometheus.DefaultRegisterer)
-	server, err := RunSSServer("config_example.yml", 30*time.Second, m, 10000)
+	server, err := RunSSServer("config_example.yml", 30*time.Second, m, 10000, nil)
 	if err != nil {
 		t.Fatalf("RunSSServer() error = %v", err)
 	}
